@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Area, Level
+from .models import User, Area, Level, Image, Pereval
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -23,7 +23,7 @@ class UserSerializer(serializers.ModelSerializer):
         return User.objects.create(**validated_data)
 
 class AreaSerializer(serializers.ModelSerializer):
-    parent_id = serializers.IntegerField(required=False, allow_null=True)
+    parent_id = serializers.IntegerField(source="parent.id", required=False, allow_null=True)
 
     class Meta:
         model = Area
@@ -72,8 +72,54 @@ class PerevalSerializer(serializers.Serializer):
             raise serializers.ValidationError("Название перевала не может быть пустым")
         return data
 
-
 class SubmitDataSerializer(serializers.Serializer):
     user = UserSerializer()
     area = AreaSerializer()
     pereval = PerevalSerializer()
+
+class ImageSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Image
+        fields = ["title", "image", "date_added"]
+
+    def get_image(self, obj):
+        request = self.context.get("request")
+        if obj.image and request:
+            return request.build_absolute_uri(obj.image.url)
+        return None
+
+class PerevalDetailSerializer(serializers.ModelSerializer):
+    user = UserSerializer()
+    area = AreaSerializer()
+    coords = CoordsSerializer(source="*")
+    level = LevelSerializer()
+    images = ImageSerializer(many=True)
+    status = serializers.CharField()
+
+    class Meta:
+        model = Pereval
+        fields = [
+            "id",
+            "beauty_title",
+            "title",
+            "other_titles",
+            "connect",
+            "user",
+            "area",
+            "coords",
+            "level",
+            "images",
+            "status",
+            "date_added",
+        ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["coords"] = {
+            "latitude": data["coords"]["latitude"],
+            "longitude": data["coords"]["longitude"],
+            "height": data["coords"]["height"],
+        }
+        return data

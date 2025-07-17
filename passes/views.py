@@ -1,11 +1,14 @@
 import json
+
+from django.db import DatabaseError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status as http_status
 from rest_framework.parsers import FormParser, MultiPartParser
-from .serializers import SubmitDataSerializer
+
 from .data_manager import PerevalDataManager
-from django.db import DatabaseError
+from .serializers import PerevalDetailSerializer, SubmitDataSerializer
+from .models import Pereval
 
 
 class SubmitDataView(APIView):
@@ -66,6 +69,17 @@ class SubmitDataView(APIView):
                 status=http_status.HTTP_400_BAD_REQUEST
             )
 
-    def get(self):
-        pass
-    
+    def get(self, request, id=None):
+        try:
+            pereval = Pereval.objects.get(id=id)
+            serializer = PerevalDetailSerializer(pereval, context={"request": request})
+            return Response(serializer.data, status=http_status.HTTP_200_OK)
+        except Pereval.DoesNotExist:
+            return Response(
+                {"status": 404, "message": "Перевал не найден", "id": None}, status=http_status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"status": 500, "message": f"Ошибка сервера: {str(e)}", "id": None},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
