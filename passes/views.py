@@ -1,6 +1,8 @@
 import json
 
 from django.db import DatabaseError
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status as http_status
@@ -13,6 +15,36 @@ from .models import Pereval
 
 class SubmitDataView(APIView):
     parser_classes = (MultiPartParser, FormParser)
+
+    @swagger_auto_schema(
+        operation_description="Получить список перевалов по email пользователя или данные перевала по ID.",
+        manual_parameters=[
+            openapi.Parameter(
+                "user__email",
+                openapi.IN_QUERY,
+                description="Email пользователя для фильтрации перевалов",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+        ],
+        responses={
+            200: openapi.Response(
+                description="Список перевалов или данные перевала", schema=PerevalDetailSerializer(many=True)
+            ),
+            400: openapi.Response(
+                description="Ошибка: Email обязателен",
+                examples={"application/json": {"status": 400, "message": "Email обязателен"}},
+            ),
+            404: openapi.Response(
+                description="Перевал не найден",
+                examples={"application/json": {"status": 404, "message": "Перевал не найден"}},
+            ),
+            500: openapi.Response(
+                description="Ошибка сервера",
+                examples={"application/json": {"status": 500, "message": "Ошибка сервера"}},
+            ),
+        },
+    )
 
     def post(self, request):
         try:
@@ -40,7 +72,7 @@ class SubmitDataView(APIView):
             return Response(
                 {
                     "status": 200,
-                    "message": None,
+                    "message": "",
                     "id": pereval.id
                 },
                 status=http_status.HTTP_200_OK
@@ -69,6 +101,46 @@ class SubmitDataView(APIView):
                 status=http_status.HTTP_400_BAD_REQUEST
             )
 
+    @swagger_auto_schema(
+        operation_description="Обновить существующий перевал (доступно только для статуса 'new').",
+        manual_parameters=[
+            openapi.Parameter(
+                "data",
+                openapi.IN_FORM,
+                description="JSON-строка с данными перевала (area, pereval)",
+                type=openapi.TYPE_STRING,
+                required=True,
+            ),
+            openapi.Parameter(
+                "images",
+                openapi.IN_FORM,
+                description="Файлы изображений (multipart/form-data)",
+                type=openapi.TYPE_FILE,
+                required=True,
+            ),
+        ],
+        consumes=["multipart/form-data"],
+        responses={
+            200: openapi.Response(
+                description="Перевал успешно обновлен", examples={"application/json": {"state": 1, "message": ""}}
+            ),
+            400: openapi.Response(
+                description="Ошибка валидации, статуса или формата данных",
+                examples={
+                    "application/json": {"state": 0, "message": "Редактирование возможно только для статуса 'new'"}
+                },
+            ),
+            404: openapi.Response(
+                description="Перевал не найден",
+                examples={"application/json": {"state": 0, "message": "Перевал не найден"}},
+            ),
+            500: openapi.Response(
+                description="Ошибка сервера",
+                examples={"application/json": {"state": 0, "message": "Неизвестная ошибка"}},
+            ),
+        },
+    )
+
     def get(self, request, id=None):
         if id is not None:
             try:
@@ -89,7 +161,7 @@ class SubmitDataView(APIView):
             # Обработка GET /submitData/?user__email=<email>
         email = request.query_params.get("user__email")
         if not email:
-            return Response({"state": 0, "message": "Email обязателен"}, status=http_status.HTTP_400_BAD_REQUEST)
+            return Response({"status": 400, "message": "Email обязателен"}, status=http_status.HTTP_400_BAD_REQUEST)
 
         try:
             perevals = Pereval.objects.filter(user__email=email)
@@ -98,9 +170,48 @@ class SubmitDataView(APIView):
         except Exception as e:
             print(f"Ошибка при получении списка перевалов: {str(e)}")
             return Response(
-                {"state": 0, "message": f"Ошибка сервера: {str(e)}"},
-                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"status": 500, "message": f"Ошибка сервера: {str(e)}"},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    @swagger_auto_schema(
+        operation_description="Создать новый перевал с данными пользователя, района, координат, уровней сложности и изображений.",
+        manual_parameters=[
+            openapi.Parameter(
+                "data",
+                openapi.IN_FORM,
+                description="JSON-строка с данными перевала (user, area, pereval)",
+                type=openapi.TYPE_STRING,
+                required=True,
+            ),
+            openapi.Parameter(
+                "images",
+                openapi.IN_FORM,
+                description="Файлы изображений (multipart/form-data)",
+                type=openapi.TYPE_FILE,
+                required=True,
+            ),
+        ],
+        consumes=["multipart/form-data"],
+        responses={
+            200: openapi.Response(
+                description="Перевал успешно создан",
+                examples={"application/json": {"status": 200, "message": "", "id": 1}},
+            ),
+            400: openapi.Response(
+                description="Ошибка валидации или формата данных",
+                examples={
+                    "application/json": {"status": 400, "message": "Некорректный формат JSON в поле data", "id": None}
+                },
+            ),
+            500: openapi.Response(
+                description="Ошибка сервера",
+                examples={
+                    "application/json": {"status": 500, "message": "Ошибка подключения к базе данных", "id": None}
+                },
+            ),
+        },
+    )
 
     def patch(self, request, id=None):
         try:

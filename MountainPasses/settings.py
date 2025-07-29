@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -43,6 +44,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'passes',
+    "drf_yasg",
 ]
 
 MIDDLEWARE = [
@@ -89,9 +91,20 @@ DATABASES = {
     }
 }
 
+if "test" in sys.argv or "pytest" in sys.modules:
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": ":memory:",
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
+
+if "test" in sys.argv or "pytest" in sys.modules:
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": ":memory:",
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -139,3 +152,5 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": [],
 }
+
+SWAGGER_USE_COMPAT_RENDERERS = False
