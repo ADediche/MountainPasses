@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    "rest_framework",
     'passes',
     "drf_yasg",
 ]
@@ -99,12 +100,6 @@ if "test" in sys.argv or "pytest" in sys.modules:
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
-if "test" in sys.argv or "pytest" in sys.modules:
-    DATABASES["default"] = {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": ":memory:",
-    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {

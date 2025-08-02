@@ -45,103 +45,8 @@ class SubmitDataView(APIView):
             ),
         },
     )
-
-    def post(self, request):
-        try:
-            data = json.loads(request.data.get("data", "{}"))
-            serializer = SubmitDataSerializer(data=data)
-            if not serializer.is_valid():
-                return Response(
-                    {"status": 400, "message": serializer.errors, "id": None}, status=http_status.HTTP_400_BAD_REQUEST
-                )
-
-            image_files = request.FILES.getlist("images", [])
-            images_data = serializer.validated_data.get("pereval", {}).get("images", [])
-
-            if images_data and len(image_files) != len(images_data):
-                return Response(
-                    {
-                        "status": 400,
-                        "message": "Количество загруженных файлов не совпадает с количеством заголовков",
-                        "id": None,
-                    },
-                    status=http_status.HTTP_400_BAD_REQUEST,
-                )
-            manager = PerevalDataManager()
-            pereval = manager.submit_data(serializer.validated_data, image_files)
-            return Response(
-                {
-                    "status": 200,
-                    "message": "",
-                    "id": pereval.id
-                },
-                status=http_status.HTTP_200_OK
-            )
-        except json.JSONDecodeError:
-            return Response(
-                {"status": 400, "message": "Некорректный формат JSON в поле data", "id": None},
-                status=http_status.HTTP_400_BAD_REQUEST,
-            )
-        except DatabaseError:
-            return Response(
-                {
-                    "status": 500,
-                    "message": "Ошибка подключения к базе данных",
-                    "id": None
-                },
-                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-        except ValueError as e:
-            return Response(
-                {
-                    "status": 400,
-                    "message": str(e),
-                    "id": None
-                },
-                status=http_status.HTTP_400_BAD_REQUEST
-            )
-
-    @swagger_auto_schema(
-        operation_description="Обновить существующий перевал (доступно только для статуса 'new').",
-        manual_parameters=[
-            openapi.Parameter(
-                "data",
-                openapi.IN_FORM,
-                description="JSON-строка с данными перевала (area, pereval)",
-                type=openapi.TYPE_STRING,
-                required=True,
-            ),
-            openapi.Parameter(
-                "images",
-                openapi.IN_FORM,
-                description="Файлы изображений (multipart/form-data)",
-                type=openapi.TYPE_FILE,
-                required=True,
-            ),
-        ],
-        consumes=["multipart/form-data"],
-        responses={
-            200: openapi.Response(
-                description="Перевал успешно обновлен", examples={"application/json": {"state": 1, "message": ""}}
-            ),
-            400: openapi.Response(
-                description="Ошибка валидации, статуса или формата данных",
-                examples={
-                    "application/json": {"state": 0, "message": "Редактирование возможно только для статуса 'new'"}
-                },
-            ),
-            404: openapi.Response(
-                description="Перевал не найден",
-                examples={"application/json": {"state": 0, "message": "Перевал не найден"}},
-            ),
-            500: openapi.Response(
-                description="Ошибка сервера",
-                examples={"application/json": {"state": 0, "message": "Неизвестная ошибка"}},
-            ),
-        },
-    )
-
     def get(self, request, id=None):
+        # Обработка GET /submitData/<id>/
         if id is not None:
             try:
                 pereval = Pereval.objects.get(id=id)
@@ -158,7 +63,7 @@ class SubmitDataView(APIView):
                     status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
-            # Обработка GET /submitData/?user__email=<email>
+        # Обработка GET /submitData/?user__email=<email>
         email = request.query_params.get("user__email")
         if not email:
             return Response({"status": 400, "message": "Email обязателен"}, status=http_status.HTTP_400_BAD_REQUEST)
@@ -168,7 +73,6 @@ class SubmitDataView(APIView):
             serializer = PerevalDetailSerializer(perevals, many=True, context={"request": request})
             return Response(serializer.data, status=http_status.HTTP_200_OK)
         except Exception as e:
-            print(f"Ошибка при получении списка перевалов: {str(e)}")
             return Response(
                 {"status": 500, "message": f"Ошибка сервера: {str(e)}"},
                 status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -212,7 +116,84 @@ class SubmitDataView(APIView):
             ),
         },
     )
+    def post(self, request):
+        try:
+            data = json.loads(request.data.get("data", "{}"))
+            serializer = SubmitDataSerializer(data=data)
+            if not serializer.is_valid():
+                return Response(
+                    {"status": 400, "message": serializer.errors, "id": None}, status=http_status.HTTP_400_BAD_REQUEST
+                )
 
+            image_files = request.FILES.getlist("images", [])
+            images_data = serializer.validated_data.get("pereval", {}).get("images", [])
+
+            if images_data and len(image_files) != len(images_data):
+                return Response(
+                    {
+                        "status": 400,
+                        "message": "Количество загруженных файлов не совпадает с количеством заголовков",
+                        "id": None,
+                    },
+                    status=http_status.HTTP_400_BAD_REQUEST,
+                )
+
+            manager = PerevalDataManager()
+            pereval = manager.submit_data(serializer.validated_data, image_files)
+            return Response({"status": 200, "message": "", "id": pereval.id}, status=http_status.HTTP_200_OK)
+
+        except json.JSONDecodeError:
+            return Response(
+                {"status": 400, "message": "Некорректный формат JSON в поле data", "id": None},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+        except DatabaseError:
+            return Response(
+                {"status": 500, "message": "Ошибка подключения к базе данных", "id": None},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        except ValueError as e:
+            return Response({"status": 400, "message": str(e), "id": None}, status=http_status.HTTP_400_BAD_REQUEST)
+
+    @swagger_auto_schema(
+        operation_description="Обновить существующий перевал (доступно только для статуса 'new').",
+        manual_parameters=[
+            openapi.Parameter(
+                "data",
+                openapi.IN_FORM,
+                description="JSON-строка с данными перевала (area, pereval)",
+                type=openapi.TYPE_STRING,
+                required=True,
+            ),
+            openapi.Parameter(
+                "images",
+                openapi.IN_FORM,
+                description="Файлы изображений (multipart/form-data)",
+                type=openapi.TYPE_FILE,
+                required=True,
+            ),
+        ],
+        consumes=["multipart/form-data"],
+        responses={
+            200: openapi.Response(
+                description="Перевал успешно обновлен", examples={"application/json": {"state": 1, "message": ""}}
+            ),
+            400: openapi.Response(
+                description="Ошибка валидации, статуса или формата данных",
+                examples={
+                    "application/json": {"state": 0, "message": "Редактирование возможно только для статуса 'new'"}
+                },
+            ),
+            404: openapi.Response(
+                description="Перевал не найден",
+                examples={"application/json": {"state": 0, "message": "Перевал не найден"}},
+            ),
+            500: openapi.Response(
+                description="Ошибка сервера",
+                examples={"application/json": {"state": 0, "message": "Неизвестная ошибка"}},
+            ),
+        },
+    )
     def patch(self, request, id=None):
         try:
             data = json.loads(request.data.get("data", "{}"))

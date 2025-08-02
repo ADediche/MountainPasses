@@ -1,4 +1,5 @@
 from django.db import IntegrityError
+
 from .models import Area, Image, Level, Pereval, User
 
 
@@ -106,6 +107,7 @@ class PerevalDataManager:
         """
         if len(images_data) != len(image_files):
             raise ValueError("Количество заголовков изображений не совпадает с количеством файлов")
+
         images = []
         for image_data, image_file in zip(images_data, image_files):
             try:
